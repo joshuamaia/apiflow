@@ -1,0 +1,180 @@
+@if (span(); as s) {
+  <!-- ===== Span details ===== -->
+  <section class="panel-section">
+    <header class="head" [class]="'head--' + state()">
+      <div class="head__icon"><mat-icon>{{ types[s.type].icon }}</mat-icon></div>
+      <div class="head__titles">
+        <h3>{{ s.component }}</h3>
+        <span class="chip chip--state">{{ state() === 'slow' ? 'Slow' : s.status }}</span>
+        <span class="chip">{{ types[s.type].label }}</span>
+      </div>
+      <button mat-icon-button (click)="player.select(null)" matTooltip="Back to trace overview" aria-label="Close details">
+        <mat-icon>close</mat-icon>
+      </button>
+    </header>
+
+    <div class="big-numbers">
+      <div><strong>{{ duration(s.durationMs) }}</strong><span>Duration</span></div>
+      <div>
+        @if (comparison.value()?.baselineMedianMs != null) {
+          <strong>{{ duration(comparison.value()!.baselineMedianMs) }}</strong>
+        } @else {
+          <strong>—</strong>
+        }
+        <span matTooltip="Median of completed executions of this operation, excluding demo delays">Normal (median)</span>
+      </div>
+      <div>
+        @if (comparison.value()?.deltaFromBaselineMs != null) {
+          <strong [class.worse]="comparison.value()!.deltaFromBaselineMs! > 1">
+            {{ comparison.value()!.deltaFromBaselineMs! >= 0 ? '+' : '−' }}{{ duration(abs(comparison.value()!.deltaFromBaselineMs!)) }}
+          </strong>
+        } @else {
+          <strong>—</strong>
+        }
+        <span>Difference</span>
+      </div>
+    </div>
+
+    @if (s.artificialDelayMs) {
+      <div class="notice notice--slow">
+        <mat-icon>science</mat-icon>
+        <span>Includes an <b>artificial delay of {{ s.artificialDelayMs }} ms</b> injected on purpose for the demonstration.
+          This is not natural latency.</span>
+      </div>
+    }
+    @if (s.status === 'ERROR') {
+      <div class="notice notice--error">
+        <mat-icon>error</mat-icon>
+        <div>
+          <b>{{ shortType(s.errorType) }}</b>
+          <p>{{ s.errorMessage || 'No message' }}</p>
+        </div>
+      </div>
+    }
+
+    <dl class="props">
+      <dt>Operation</dt><dd class="mono">{{ s.operation }}()</dd>
+      <dt>Trace ID</dt>
+      <dd class="mono copyable" (click)="copy(s.traceId)" matTooltip="Copy">{{ s.traceId }}</dd>
+      <dt>Span ID</dt>
+      <dd class="mono copyable" (click)="copy(s.spanId)" matTooltip="Copy">{{ s.spanId }}</dd>
+      <dt>Parent span</dt>
+      <dd class="mono">{{ s.parentSpanId ?? '—' }}
+        @if (s.parentSpanId && ancestors().length === 0) { <span class="hint">(HTTP server span)</span> }
+      </dd>
+      <dt>Started</dt><dd class="mono">{{ clock(s.startedAt) }}</dd>
+      <dt>Finished</dt><dd class="mono">{{ clock(s.finishedAt) }}</dd>
+      <dt>Sequence</dt><dd class="mono">#{{ s.sequence + 1 }}</dd>
+    </dl>
+  </section>
+
+  <section class="panel-section">
+    <h4>Execution hierarchy</h4>
+    <ol class="hierarchy">
+      @for (a of ancestors(); track a.spanId) {
+        <li><button class="link" (click)="selectSpan(a)"><mat-icon>{{ types[a.type].icon }}</mat-icon>{{ a.component }}.{{ a.operation }}</button></li>
+      }
+      <li class="current"><mat-icon>{{ types[s.type].icon }}</mat-icon>{{ s.component }}.{{ s.operation }}</li>
+      @for (c of children(); track c.spanId) {
+        <li class="child"><button class="link" (click)="selectSpan(c)"><mat-icon>subdirectory_arrow_right</mat-icon>{{ c.component }}.{{ c.operation }}
+          <span class="mono muted">{{ duration(c.durationMs) }}</span></button></li>
+      }
+    </ol>
+  </section>
+} @else if (ghost(); as g) {
+  <!-- ===== Step not executed ===== -->
+  <section class="panel-section">
+    <header class="head head--skipped">
+      <div class="head__icon"><mat-icon>{{ types[g.type].icon }}</mat-icon></div>
+      <div class="head__titles">
+        <h3>{{ g.component }}</h3>
+        <span class="chip chip--state">{{ g.state === 'waiting' ? 'Waiting' : 'Not executed' }}</span>
+      </div>
+      <button mat-icon-button (click)="player.select(null)" aria-label="Close details"><mat-icon>close</mat-icon></button>
+    </header>
+    <p class="explain">
+      <span class="mono">{{ g.operation }}()</span>
+      @if (g.state === 'skipped') {
+        was not executed: the request failed before reaching this step. It is shown because it ran in the last successful
+        execution of this endpoint (reference trace <span class="mono">{{ player.reference()?.traceId?.slice(0, 12) }}…</span>).
+      } @else {
+        has not run yet. It is expected because it ran in the reference execution of this endpoint.
+      }
+    </p>
+  </section>
+} @else if (trace(); as t) {
+  <!-- ===== Trace overview ===== -->
+  <section class="panel-section">
+    <header class="request">
+      <span class="method">{{ t.httpMethod }}</span>
+      <span class="endpoint mono">{{ t.endpoint }}</span>
+    </header>
+    <div class="status-row">
+      @switch (t.status) {
+        @case ('SUCCESS') { <span class="pill pill--ok"><mat-icon>check_circle</mat-icon>HTTP {{ t.httpStatus }}</span> }
+        @case ('ERROR') { <span class="pill pill--error"><mat-icon>cancel</mat-icon>HTTP {{ t.httpStatus }}</span> }
+        @default { <span class="pill pill--running"><span class="spin"></span>Running</span> }
+      }
+      @if (t.scenario) {
+        <span class="pill pill--scenario" matTooltip="Label sent by the demo runner">scenario: {{ t.scenario }}</span>
+      }
+    </div>
+
+    <div class="big-numbers">
+      <div><strong>{{ duration(t.durationMs) }}</strong><span>Total</span></div>
+      <div><strong>{{ player.spans().length }}</strong><span>Steps executed</span></div>
+      <div><strong>{{ notExecuted() }}</strong><span>Not executed</span></div>
+    </div>
+
+    @if (failure(); as f) {
+      <div class="notice notice--error clickable" (click)="selectSpan(f)">
+        <mat-icon>error</mat-icon>
+        <div>
+          <b>Failed at {{ f.component }}.{{ f.operation }}()</b>
+          <p>{{ shortType(f.errorType) }}: {{ f.errorMessage }}</p>
+        </div>
+      </div>
+    }
+    @if (slowest(); as sl) {
+      @if (sl.slow) {
+        <div class="notice notice--slow clickable" (click)="selectSpan(sl)">
+          <mat-icon>hourglass_top</mat-icon>
+          <span><b>{{ sl.component }}.{{ sl.operation }}()</b> took {{ duration(sl.durationMs) }}
+            @if (sl.artificialDelayMs) { (artificial demo delay of {{ sl.artificialDelayMs }} ms) }</span>
+        </div>
+      }
+    }
+
+    <dl class="props">
+      <dt>Trace ID</dt>
+      <dd class="mono copyable" (click)="copy(t.traceId)" matTooltip="Copy">{{ t.traceId }}</dd>
+      <dt>Started</dt><dd class="mono">{{ clock(t.startedAt) }}</dd>
+      <dt>Finished</dt><dd class="mono">{{ clock(t.finishedAt) }}</dd>
+    </dl>
+  </section>
+
+  <section class="panel-section">
+    <h4>Execution order <span class="muted">· click a step to select it</span></h4>
+    <div class="waterfall">
+      @for (row of waterfall(); track row.span.spanId) {
+        <button class="wf-row" [class]="'wf-row--' + row.state" [class.wf-row--active]="player.activeSpanId() === row.span.spanId"
+                (click)="jumpTo(row.span)" [matTooltip]="row.span.component + '.' + row.span.operation + ' · ' + duration(row.span.durationMs)">
+          <span class="wf-row__label" [style.padding-left.px]="row.depth * 10">
+            <span class="wf-row__seq">{{ row.span.sequence + 1 }}</span>{{ row.span.component }}
+          </span>
+          <span class="wf-row__track">
+            <span class="wf-row__bar" [style.left.%]="row.left" [style.width.%]="row.width"></span>
+          </span>
+          <span class="wf-row__time">{{ duration(row.span.durationMs) }}</span>
+        </button>
+      } @empty {
+        <p class="muted">Waiting for the first step…</p>
+      }
+    </div>
+  </section>
+} @else {
+  <section class="panel-section empty">
+    <mat-icon>touch_app</mat-icon>
+    <p>Run a demo scenario or open an execution from the history to see its flow.</p>
+  </section>
+}

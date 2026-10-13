@@ -1,0 +1,99 @@
+<div class="page">
+  <header class="title">
+    <div>
+      <h1>Execution history</h1>
+      <p>Every tracked request persisted by the backend. Open one to replay it with its real timestamps.</p>
+    </div>
+    <button mat-stroked-button class="danger" (click)="clear()"><mat-icon>delete_sweep</mat-icon>Clear demo data</button>
+  </header>
+
+  <form class="filters panel" [formGroup]="filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Status</mat-label>
+      <mat-select formControlName="status">
+        <mat-option [value]="null">Any</mat-option>
+        <mat-option value="SUCCESS">Success</mat-option>
+        <mat-option value="ERROR">Error</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Method</mat-label>
+      <mat-select formControlName="method">
+        <mat-option [value]="null">Any</mat-option>
+        @for (m of ['GET', 'POST', 'PUT', 'DELETE']; track m) { <mat-option [value]="m">{{ m }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="grow">
+      <mat-label>Endpoint contains</mat-label>
+      <input matInput formControlName="endpoint" placeholder="/api/orders" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Scenario</mat-label>
+      <mat-select formControlName="scenario">
+        <mat-option [value]="null">Any</mat-option>
+        @for (s of ['success', 'stock-error', 'slow', 'custom']; track s) { <mat-option [value]="s">{{ s }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Min duration (ms)</mat-label>
+      <input matInput type="number" min="0" formControlName="minDurationMs" />
+    </mat-form-field>
+    <button mat-button type="button" (click)="resetFilters()"><mat-icon>filter_alt_off</mat-icon>Reset</button>
+  </form>
+
+  <section class="panel table-panel">
+    @if (loading()) { <mat-progress-bar mode="indeterminate" /> }
+    <div class="table-scroll">
+      <table mat-table [dataSource]="page()?.content ?? []">
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let t">
+            <span class="status" [class.status--error]="t.status === 'ERROR'">
+              <mat-icon>{{ t.status === 'ERROR' ? 'cancel' : 'check_circle' }}</mat-icon>{{ t.httpStatus }}
+            </span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="request">
+          <th mat-header-cell *matHeaderCellDef>Request</th>
+          <td mat-cell *matCellDef="let t">
+            <div class="request"><span class="method">{{ t.httpMethod }}</span><span class="mono">{{ t.endpoint }}</span></div>
+            <div class="mono muted small">{{ t.traceId }}</div>
+            @if (t.errorMessage) { <div class="error small">{{ t.errorMessage }}</div> }
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="scenario">
+          <th mat-header-cell *matHeaderCellDef>Scenario</th>
+          <td mat-cell *matCellDef="let t">@if (t.scenario) { <span class="tag">{{ t.scenario }}</span> } @else { <span class="muted">—</span> }</td>
+        </ng-container>
+        <ng-container matColumnDef="duration">
+          <th mat-header-cell *matHeaderCellDef class="num">Duration</th>
+          <td mat-cell *matCellDef="let t" class="num mono">{{ duration(t.durationMs) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="spans">
+          <th mat-header-cell *matHeaderCellDef class="num">Steps</th>
+          <td mat-cell *matCellDef="let t" class="num mono">{{ t.spanCount }}</td>
+        </ng-container>
+        <ng-container matColumnDef="started">
+          <th mat-header-cell *matHeaderCellDef>Started</th>
+          <td mat-cell *matCellDef="let t"><span [matTooltip]="clock(t.startedAt)">{{ relative(t.startedAt) }}</span></td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let t" class="num">
+            <button mat-icon-button (click)="open(t); $event.stopPropagation()" matTooltip="Replay" aria-label="Replay">
+              <mat-icon>play_circle</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns" class="row" (click)="open(row)"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="no-data" [attr.colspan]="columns.length">No traces match the filters.</td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [length]="page()?.totalElements ?? 0" [pageIndex]="pageIndex()" [pageSize]="pageSize()"
+                   [pageSizeOptions]="[10, 20, 50, 100]" (page)="onPage($event)" aria-label="Select page" />
+  </section>
+</div>

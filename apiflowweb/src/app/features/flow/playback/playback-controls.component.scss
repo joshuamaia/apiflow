@@ -1,0 +1,91 @@
+:host {
+  display: block;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font: 700 11px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  mat-icon { font-size: 15px; width: 15px; height: 15px; }
+
+  &--live {
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.12);
+  }
+
+  &--replay {
+    color: #c4b5fd;
+    border-color: rgba(139, 92, 246, 0.5);
+    background: rgba(139, 92, 246, 0.12);
+  }
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--c-error);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.play {
+  min-width: 44px;
+  padding: 0 10px;
+  mat-icon { margin: 0; }
+}
+
+.scrubber {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+
+.speeds {
+  --mat-button-toggle-height: 30px;
+  font-size: 12px;
+}
+
+.caption {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+
+  &__step {
+    flex: none;
+    font-family: var(--font-mono);
+    color: var(--text);
+  }
+
+  &__text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@keyframes blink {
+  50% { opacity: 0.3; }
+}

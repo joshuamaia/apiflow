@@ -1,0 +1,98 @@
+:host { display: block; }
+
+.lead { margin: 10px 0 12px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.empty { color: var(--muted); font-size: 12.5px; }
+code { font-family: var(--font-mono); font-size: 11.5px; }
+
+.form { display: flex; flex-direction: column; gap: 10px; }
+
+.method {
+  display: inline-block;
+  min-width: 46px;
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font: 700 10.5px var(--font-mono);
+  text-align: center;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.15);
+
+  &--POST { color: #86efac; background: rgba(34, 197, 94, 0.15); }
+  &--PUT, &--PATCH { color: #fde68a; background: rgba(234, 179, 8, 0.15); }
+  &--DELETE { color: #fca5a5; background: rgba(239, 68, 68, 0.15); }
+}
+
+.path { font-family: var(--font-mono); font-size: 12.5px; }
+
+.handler {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 11.5px var(--font-mono);
+  color: var(--muted);
+  mat-icon { font-size: 16px; width: 16px; height: 16px; color: var(--c-completed); }
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  &__title { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+}
+
+.body textarea { font: 12px/1.45 var(--font-mono); }
+.reset { align-self: flex-end; margin-top: -6px; }
+
+.url {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  code { overflow-wrap: anywhere; color: var(--text); }
+}
+
+.result {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.06);
+
+  &--error { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.06); }
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    font-size: 12px;
+    color: var(--muted);
+    b { color: var(--text); font-size: 13px; }
+  }
+
+  pre {
+    max-height: 180px;
+    margin: 6px 0 0;
+    overflow: auto;
+    font: 11px/1.4 var(--font-mono);
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+.warn { color: var(--c-slow); }
+
+.delay {
+  &__row { display: flex; flex-direction: column; gap: 8px; }
+  &__ms { width: 120px; }
+}
+
+.hint {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  &--error { color: #fca5a5; }
+}

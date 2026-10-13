@@ -1,0 +1,95 @@
+@use '@angular/material' as mat;
+
+/* ---------- Design tokens ---------- */
+:root {
+  --bg: #0a0e13;
+  --canvas: #0c1118;
+  --panel: #10151c;
+  --border: #1e2631;
+  --grid: rgba(148, 163, 184, 0.05);
+  --text: #e6edf3;
+  --muted: #8b98a9;
+
+  /* node / status colors (gray, blue, green, yellow, red as specified) */
+  --c-waiting: #64748b;
+  --c-running: #3b82f6;
+  --c-completed: #22c55e;
+  --c-slow: #eab308;
+  --c-error: #ef4444;
+  --c-skipped: #475569;
+
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  color-scheme: dark;
+
+  @include mat.theme((
+    color: (
+      theme-type: dark,
+      primary: mat.$azure-palette,
+      tertiary: mat.$green-palette,
+    ),
+    typography: (
+      plain-family: 'Inter',
+      brand-family: 'Inter',
+    ),
+    density: -1,
+  ));
+
+  @include mat.table-overrides((
+    background-color: transparent,
+    header-headline-color: var(--muted),
+    row-item-outline-color: var(--border),
+  ));
+  @include mat.paginator-overrides((container-background-color: transparent));
+  @include mat.tooltip-overrides((
+    container-color: #1b2430,
+    supporting-text-color: var(--text),
+  ));
+  @include mat.button-toggle-overrides((
+    divider-color: var(--border),
+    selected-state-background-color: rgba(59, 130, 246, 0.2),
+    selected-state-text-color: #bfdbfe,
+  ));
+}
+
+/* ---------- Base ---------- */
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+::selection { background: rgba(59, 130, 246, 0.35); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #232c38; border-radius: 10px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* multi-line tooltips on graph nodes */
+.graph-tooltip .mdc-tooltip__surface {
+  white-space: pre-line;
+  text-align: left;
+  max-width: 320px !important;
+  font-family: var(--font-body);
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,114 @@
+<p class="lead">Any tracked endpoint of the backend, discovered from its Spring MVC mappings.</p>
+
+@if (endpoints(); as list) {
+  @if (list.length === 0) {
+    <p class="empty">No tracked endpoints found. Check <code>flow.tracking.include-paths</code>.</p>
+  } @else {
+    <div class="form">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Endpoint</mat-label>
+        <mat-select [formControl]="endpoint" [panelWidth]="null">
+          <mat-select-trigger>
+            @if (endpoint.value; as selected) {
+              <span class="method" [class]="'method method--' + selected.method">{{ selected.method }}</span>
+              <span class="path">{{ selected.path }}</span>
+            }
+          </mat-select-trigger>
+          @for (e of list; track key(e)) {
+            <mat-option [value]="e">
+              <span class="method" [class]="'method method--' + e.method">{{ e.method }}</span>
+              <span class="path">{{ e.path }}</span>
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      @if (endpoint.value; as e) {
+        <div class="handler" [matTooltip]="e.instrumented ? 'The handler has @FlowTrack' : 'The handler has no @FlowTrack: only nested steps (if any) will appear'">
+          <mat-icon>{{ e.instrumented ? 'verified' : 'help' }}</mat-icon>{{ e.handler }}()
+        </div>
+
+        @if (names(pathValues).length) {
+          <div class="group" [formGroup]="pathValues">
+            <span class="group__title">Path variables</span>
+            @for (name of names(pathValues); track name) {
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>{{ name }}</mat-label>
+                <input matInput [formControlName]="name" />
+              </mat-form-field>
+            }
+          </div>
+        }
+
+        @if (names(queryValues).length) {
+          <div class="group" [formGroup]="queryValues">
+            <span class="group__title">Query parameters</span>
+            @for (name of names(queryValues); track name) {
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>{{ name }}</mat-label>
+                <input matInput [formControlName]="name" />
+              </mat-form-field>
+            }
+          </div>
+        }
+
+        @if (e.hasBody) {
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="body">
+            <mat-label>JSON body</mat-label>
+            <textarea matInput [formControl]="body" rows="7" spellcheck="false"></textarea>
+            @if (body.hasError('json')) { <mat-error>Invalid JSON</mat-error> }
+          </mat-form-field>
+          <button mat-button type="button" class="reset" (click)="resetBody()"><mat-icon>restart_alt</mat-icon>Reset body</button>
+        }
+
+        <div class="group delay">
+          <span class="group__title">Artificial delay (demo)</span>
+          <div class="delay__row">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="delay__ms">
+              <mat-label>ms</mat-label>
+              <input matInput type="number" min="0" max="5000" step="100" [formControl]="delayMs" />
+              @if (delayMs.invalid) { <mat-error>0–5000</mat-error> }
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="delay__target">
+              <mat-label>Step to slow down</mat-label>
+              <input matInput [formControl]="delayTarget" [matAutocomplete]="steps" placeholder="Component.operation" />
+              <mat-autocomplete #steps="matAutocomplete">
+                @for (t of filteredTargets(); track t) {
+                  <mat-option [value]="t"><span class="path">{{ t }}</span></mat-option>
+                }
+              </mat-autocomplete>
+            </mat-form-field>
+          </div>
+          @if (delayIncomplete() && delayTarget.touched) {
+            <span class="hint hint--error">Choose the step that should receive the delay
+              (<code>Component</code> or <code>Component.operation</code>).</span>
+          } @else if (targets().length <= 1) {
+            <span class="hint">Only the entry step is known until this endpoint runs once — send it once to list
+              all its steps here.</span>
+          } @else {
+            <span class="hint">Applied once, inside the first matching step, and flagged as artificial.</span>
+          }
+        </div>
+
+        <div class="url"><span class="method" [class]="'method method--' + e.method">{{ e.method }}</span><code>{{ url() }}</code></div>
+
+        <button mat-flat-button type="button" (click)="send()" [disabled]="sending()">
+          <mat-icon>send</mat-icon>Send request
+        </button>
+      }
+
+      @if (result(); as r) {
+        <div class="result" [class.result--error]="r.httpStatus >= 400">
+          <div class="result__head">
+            <b>HTTP {{ r.httpStatus }}</b>
+            <span>{{ duration(r.durationMs) }} round trip</span>
+            @if (!r.traceId) { <span class="warn">not tracked</span> }
+          </div>
+          @if (r.responsePreview) { <pre>{{ r.responsePreview }}</pre> }
+        </div>
+      }
+    </div>
+  }
+} @else {
+  <p class="empty">Loading endpoints…</p>
+}

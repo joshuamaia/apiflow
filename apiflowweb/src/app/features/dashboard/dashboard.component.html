@@ -1,0 +1,67 @@
+<div class="page">
+  <app-metric-cards (open)="openHistory($event)" />
+
+  <div class="workspace">
+    <aside class="panel runner">
+      <app-scenario-runner (executed)="onExecuted($event)" />
+    </aside>
+
+    <section class="panel flow">
+      <header class="flow__head">
+        <div class="flow__title">
+          <h2>Request flow</h2>
+          @if (player.trace(); as t) {
+            <span class="flow__trace">
+              <span class="method">{{ t.httpMethod }}</span>
+              <span class="mono">{{ t.endpoint }}</span>
+              <span class="mono muted" [matTooltip]="t.traceId">{{ t.traceId.slice(0, 12) }}…</span>
+            </span>
+          }
+        </div>
+        <mat-slide-toggle [checked]="followLive()" (change)="followLive.set($event.checked)"
+                          matTooltip="Switch to every new request as soon as it reaches the backend">
+          Follow live requests
+        </mat-slide-toggle>
+      </header>
+
+      <div class="flow__canvas">
+        <app-flow-graph [graph]="player.graph()" [selectedSpanId]="player.selectedSpanId()"
+                        [selectedKey]="player.selectedKey()" [activeSpanId]="player.activeSpanId()"
+                        (nodeSelected)="onNodeSelected($event)" />
+
+        <div class="overlays">
+          @if (banner(); as b) {
+            <div class="banner" [class.banner--error]="!b.ok">
+              <mat-icon>{{ b.ok ? 'task_alt' : 'report' }}</mat-icon>{{ b.text }}
+            </div>
+          }
+          @if (player.reference() && player.phase() !== 'success') {
+            <div class="reference" matTooltip="Dashed nodes come from the last successful execution of this endpoint">
+              <mat-icon>info</mat-icon>Expected steps from reference trace {{ player.reference()!.traceId.slice(0, 8) }}…
+            </div>
+          }
+        </div>
+        @if (player.mode() === 'idle') {
+          <div class="placeholder">
+            <mat-icon>hub</mat-icon>
+            <h3>No execution selected</h3>
+            <p>Run a scenario on the left. Each request is captured by the backend and drawn here as it happens.</p>
+          </div>
+        }
+      </div>
+
+      <footer class="flow__foot">
+        <app-playback-controls />
+      </footer>
+    </section>
+
+    <aside class="panel details">
+      <app-flow-details />
+    </aside>
+  </div>
+
+  <div class="bottom">
+    <section class="panel"><app-history-list [currentTraceId]="player.trace()?.traceId ?? null" (open)="openHistory($event)" /></section>
+    <section class="panel"><app-event-feed /></section>
+  </div>
+</div>

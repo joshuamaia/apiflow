@@ -1,0 +1,97 @@
+<div class="canvas">
+  <svg #svg class="surface" role="img" aria-label="Request execution graph">
+    <defs>
+      @for (state of ['pending', 'active', 'done', 'error', 'skipped']; track state) {
+        <marker [attr.id]="'arrow-' + state" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7"
+                orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" [attr.class]="'arrow arrow--' + state" />
+        </marker>
+      }
+    </defs>
+
+    <g #viewport>
+      <g class="edges">
+        @for (edge of graph().edges; track edge.key) {
+          <g class="edge" [class]="'edge--' + edge.state"
+             [class.edge--highlight]="highlighted().has(edge.to)"
+             [class.edge--dim]="highlighted().size > 0 && !highlighted().has(edge.to)">
+            <path class="edge__base" [attr.d]="edge.path" [attr.marker-end]="'url(#arrow-' + edge.state + ')'" />
+            @if (edge.state === 'active' || edge.state === 'done' || edge.state === 'error') {
+              <path class="edge__flow" [attr.d]="edge.path" />
+            }
+            @if (edge.order) {
+              <foreignObject [attr.x]="edge.labelX - 22" [attr.y]="edge.labelY - 11" width="44" height="22">
+                <div class="edge__label">#{{ edge.order }}</div>
+              </foreignObject>
+            }
+          </g>
+        }
+      </g>
+
+      <g class="nodes">
+        @for (node of graph().nodes; track node.key) {
+          <g class="node"
+             [style.transform]="'translate(' + node.x + 'px,' + node.y + 'px)'">
+            <foreignObject [attr.width]="nodeWidth" [attr.height]="nodeHeight">
+              <div class="card" [class]="'card--' + node.state"
+                   [class.card--selected]="selected() === node.key"
+                   [class.card--active]="activeKey() === node.key"
+                   [class.card--dim]="highlighted().size > 0 && !highlighted().has(node.key)"
+                   tabindex="0" role="button"
+                   [attr.aria-label]="node.component + ' ' + node.operation + ' ' + stateLabels[node.state]"
+                   [matTooltip]="tooltip(node)" matTooltipClass="graph-tooltip" matTooltipPosition="above"
+                   [matTooltipShowDelay]="350"
+                   (click)="select(node)" (keydown.enter)="select(node)">
+                <div class="card__head">
+                  <div class="card__icon">
+                    <mat-icon>{{ types[node.type].icon }}</mat-icon>
+                  </div>
+                  <div class="card__titles">
+                    <div class="card__name">{{ node.component }}</div>
+                    <div class="card__status">
+                      <span class="dot"></span>
+                      @switch (node.state) {
+                        @case ('running') { <span>Running…</span> }
+                        @case ('slow') { <span>Slow</span> }
+                        @default { <span>{{ stateLabels[node.state] }}</span> }
+                      }
+                      <span class="card__type">{{ types[node.type].label }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card__foot">
+                  <span class="card__op" [title]="node.operation">{{ node.operation }}()</span>
+                  <span class="card__time">
+                    @if (node.span?.durationMs != null) {
+                      {{ duration(node.span!.durationMs) }}
+                    } @else if (node.state === 'running') {
+                      <span class="spinner"></span>
+                    } @else {
+                      —
+                    }
+                  </span>
+                </div>
+              </div>
+            </foreignObject>
+          </g>
+        }
+      </g>
+    </g>
+  </svg>
+
+  <div class="toolbar">
+    <button mat-icon-button (click)="zoomBy(1.25)" matTooltip="Zoom in" aria-label="Zoom in"><mat-icon>add</mat-icon></button>
+    <span class="toolbar__zoom">{{ zoomPercent() }}%</span>
+    <button mat-icon-button (click)="zoomBy(0.8)" matTooltip="Zoom out" aria-label="Zoom out"><mat-icon>remove</mat-icon></button>
+    <button mat-icon-button (click)="recenter()" matTooltip="Fit to view" aria-label="Fit to view"><mat-icon>center_focus_strong</mat-icon></button>
+  </div>
+
+  <div class="legend">
+    <span class="legend__item legend__item--waiting">Waiting</span>
+    <span class="legend__item legend__item--running">Running</span>
+    <span class="legend__item legend__item--completed">Completed</span>
+    <span class="legend__item legend__item--slow">Slow</span>
+    <span class="legend__item legend__item--error">Error</span>
+    <span class="legend__item legend__item--skipped">Not executed</span>
+  </div>
+</div>

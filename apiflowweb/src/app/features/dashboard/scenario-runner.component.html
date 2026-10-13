@@ -1,0 +1,78 @@
+<header class="head">
+  <h2>Run a request</h2>
+  <mat-button-toggle-group hideSingleSelectionIndicator [value]="tab()" (change)="tab.set($event.value)" aria-label="Request type">
+    <mat-button-toggle value="scenarios">Scenarios</mat-button-toggle>
+    <mat-button-toggle value="custom" matTooltip="Build a POST /api/orders">Order</mat-button-toggle>
+    <mat-button-toggle value="endpoint" matTooltip="Call any tracked endpoint">Endpoint</mat-button-toggle>
+  </mat-button-toggle-group>
+</header>
+
+@switch (tab()) {
+  @case ('scenarios') {
+    <p class="lead">Each scenario sends a real <code>POST /api/orders</code> to the backend. The graph follows it live.</p>
+    <div class="scenarios">
+      @for (s of scenarios; track s.id) {
+        <button class="scenario" [class]="'scenario--' + s.tone" (click)="run(s.id)" [disabled]="running() !== null">
+          <span class="scenario__icon"><mat-icon>{{ s.icon }}</mat-icon></span>
+          <span class="scenario__text">
+            <b>{{ s.title }}</b>
+            <span>{{ s.text }}</span>
+          </span>
+          @if (running() === s.id) {
+            <span class="spin"></span>
+          } @else {
+            <mat-icon class="scenario__go">play_arrow</mat-icon>
+          }
+        </button>
+      }
+    </div>
+    <div class="delay">
+      <label for="delay">Slow scenario delay <b>{{ formatDelay(delayMs()) }}</b></label>
+      <mat-slider min="100" max="5000" step="100" discrete [displayWith]="formatDelay">
+        <input id="delay" matSliderThumb [value]="delayMs()" (valueChange)="delayMs.set($event)" />
+      </mat-slider>
+      <p class="note"><mat-icon>science</mat-icon>The delay is artificial and tagged as a demo on the span.</p>
+    </div>
+  }
+  @case ('custom') {
+    <form [formGroup]="form" (ngSubmit)="submit()" class="custom">
+      <div formArrayName="lines" class="lines">
+        @for (line of lines.controls; track line; let i = $index) {
+          <div class="line" [formGroupName]="i">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="line__product">
+              <mat-label>Product</mat-label>
+              <mat-select formControlName="productId">
+                @for (p of products(); track p.id) {
+                  <mat-option [value]="p.id">{{ p.name }} <span class="stock">· {{ p.stock }} in stock</span></mat-option>
+                }
+              </mat-select>
+              @if (line.controls.productId.hasError('required')) { <mat-error>Required</mat-error> }
+            </mat-form-field>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="line__qty">
+              <mat-label>Qty</mat-label>
+              <input matInput type="number" formControlName="quantity" min="1" />
+              @if (line.controls.quantity.invalid) { <mat-error>1–10000</mat-error> }
+            </mat-form-field>
+            <button mat-icon-button type="button" (click)="removeLine(i)" [disabled]="lines.length === 1"
+                    aria-label="Remove line"><mat-icon>delete</mat-icon></button>
+          </div>
+        }
+      </div>
+      <button mat-stroked-button type="button" (click)="addLine()" [disabled]="lines.length >= 10">
+        <mat-icon>add</mat-icon>Add product
+      </button>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Artificial delay (ms, demo)</mat-label>
+        <input matInput type="number" formControlName="delayMs" min="0" max="5000" />
+        <mat-hint>0 = no delay</mat-hint>
+        @if (form.controls.delayMs.invalid) { <mat-error>0–5000</mat-error> }
+      </mat-form-field>
+      <button mat-flat-button type="submit" [disabled]="running() !== null">
+        <mat-icon>send</mat-icon>Send POST /api/orders
+      </button>
+    </form>
+  }
+  @case ('endpoint') {
+    <app-endpoint-runner (executed)="executed.emit($event)" />
+  }
+}
