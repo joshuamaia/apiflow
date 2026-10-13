@@ -1,0 +1,21 @@
+# Environment / secrets
+.env
+*.env.local
+
+# Backend
+apiflowservice/target/
+
+# Frontend
+apiflowweb/node_modules/
+apiflowweb/dist/
+apiflowweb/.angular/
+
+# IDEs / OS
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Machine-specific CA certificates for Docker builds
+docker/certs/*.crt
+docker/certs/*.pem

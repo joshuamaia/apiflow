@@ -1,0 +1,89 @@
+### API Flow Visualizer - exemplos de requisições
+### Funciona com o REST Client do VS Code ou com o HTTP Client do IntelliJ.
+### Todas passam pelo Nginx do frontend (http://localhost:4200), que faz proxy de /api para o backend.
+
+@base = http://localhost:4200
+
+### Produtos disponíveis (dados iniciais criados pelo Flyway)
+GET {{base}}/api/products
+
+### Cenário 1 — pedido válido (201 Created)
+POST {{base}}/api/orders
+Content-Type: application/json
+X-Flow-Scenario: success
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 },
+    { "productId": 2, "quantity": 2 }
+  ]
+}
+
+### Cenário 2 — estoque insuficiente (422), o produto 6 tem estoque 3
+POST {{base}}/api/orders
+Content-Type: application/json
+X-Flow-Scenario: stock-error
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 },
+    { "productId": 6, "quantity": 999 }
+  ]
+}
+
+### Cenário 3 — operação lenta: atraso ARTIFICIAL de 1500 ms no StockService (apenas demonstração)
+POST {{base}}/api/orders
+Content-Type: application/json
+X-Flow-Scenario: slow
+X-Demo-Delay-Ms: 1500
+
+{
+  "items": [
+    { "productId": 1, "quantity": 1 }
+  ]
+}
+
+### Executar os cenários pelo próprio backend (ele dispara um POST /api/orders real)
+POST {{base}}/api/demo/scenarios/success
+
+###
+POST {{base}}/api/demo/scenarios/stock-error
+
+###
+POST {{base}}/api/demo/scenarios/slow?delayMs=2000
+
+### Listar rastreamentos (paginação e filtros)
+GET {{base}}/api/flow/traces?status=ERROR&method=POST&endpoint=orders&page=0&size=20
+
+### Rastreamentos em andamento (ainda em memória)
+GET {{base}}/api/flow/traces/live
+
+### Consultar um rastreamento (troque pelo valor do header X-Flow-Trace-Id)
+@traceId = 00000000000000000000000000000000
+GET {{base}}/api/flow/traces/{{traceId}}
+
+### Etapas de um rastreamento
+GET {{base}}/api/flow/traces/{{traceId}}/spans
+
+### Detalhe de uma etapa: hierarquia + comparação com a mediana "normal"
+@spanId = 0000000000000000
+GET {{base}}/api/flow/traces/{{traceId}}/spans/{{spanId}}
+
+### Etapas esperadas de um endpoint (última execução bem-sucedida)
+GET {{base}}/api/flow/blueprint?method=POST&endpoint=/api/orders
+
+### Histórico cronológico (para gráficos)
+GET {{base}}/api/flow/history?limit=60
+
+### Métricas agregadas
+GET {{base}}/api/flow/metrics
+
+### Métricas por componente/operação
+GET {{base}}/api/flow/metrics/components
+
+### Limpar os dados de demonstração
+DELETE {{base}}/api/flow/traces
+
+### Stream de eventos em tempo real (SSE) — melhor com: curl -N http://localhost:4200/api/flow/stream
+GET {{base}}/api/flow/stream
+Accept: text/event-stream
