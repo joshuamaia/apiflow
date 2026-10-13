@@ -2,6 +2,7 @@ package br.com.joshua.apiflowservice.flowtracking.application;
 
 import br.com.joshua.apiflowservice.flowtracking.api.FlowScope;
 import br.com.joshua.apiflowservice.flowtracking.api.FlowTracker;
+import br.com.joshua.apiflowservice.flowtracking.api.SpanStartHook;
 import br.com.joshua.apiflowservice.flowtracking.application.ActiveTrace.ActiveSpan;
 import br.com.joshua.apiflowservice.flowtracking.domain.ComponentType;
 import io.micrometer.observation.Observation;
@@ -12,6 +13,7 @@ import io.micrometer.tracing.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -27,11 +29,18 @@ public class MicrometerFlowTracker implements FlowTracker {
     private final FlowRecorder recorder;
     private final ObservationRegistry observationRegistry;
     private final Tracer tracer;
+    private final List<SpanStartHook> hooks;
 
     public MicrometerFlowTracker(FlowRecorder recorder, ObservationRegistry observationRegistry, Tracer tracer) {
+        this(recorder, observationRegistry, tracer, List.of());
+    }
+
+    public MicrometerFlowTracker(FlowRecorder recorder, ObservationRegistry observationRegistry, Tracer tracer,
+                                 List<SpanStartHook> hooks) {
         this.recorder = recorder;
         this.observationRegistry = observationRegistry == null ? ObservationRegistry.NOOP : observationRegistry;
         this.tracer = tracer == null ? Tracer.NOOP : tracer;
+        this.hooks = hooks == null ? List.of() : List.copyOf(hooks);
     }
 
     @Override
@@ -60,11 +69,50 @@ public class MicrometerFlowTracker implements FlowTracker {
                 parentSpanId = context.parentId();
             }
             ActiveSpan activeSpan = recorder.openSpan(component, operation, type, spanId, parentSpanId);
-            return new ObservedScope(recorder, observation, observationScope, activeSpan);
+            FlowScope scope = new ObservedScope(recorder, observation, observationScope, activeSpan);
+            if (activeSpan != null) {
+                runHooks(component, operation, type);
+            }
+            return scope;
         } catch (RuntimeException e) {
             log.warn("Could not start flow span {}.{}; continuing untracked", component, operation, e);
             closeQuietly(observation, observationScope);
             return FlowScope.NOOP;
+        }
+    }
+
+    /** Runs the start hooks inside the new span; a failing hook never affects the step itself. */
+    private void runHooks(String component, String operation, ComponentType type) {
+        if (hooks.isEmpty()) {
+            return;
+        }
+        SpanStartHook.StartedStep step = new SpanStartHook.StartedStep() {
+            @Override
+            public String component() {
+                return component;
+            }
+
+            @Override
+            public String operation() {
+                return operation;
+            }
+
+            @Override
+            public ComponentType type() {
+                return type;
+            }
+
+            @Override
+            public void tag(String key, String value) {
+                MicrometerFlowTracker.this.tag(key, value);
+            }
+        };
+        for (SpanStartHook hook : hooks) {
+            try {
+                hook.onSpanStarted(step);
+            } catch (RuntimeException e) {
+                log.warn("Span start hook {} failed on {}.{}", hook.getClass().getSimpleName(), component, operation, e);
+            }
         }
     }
 

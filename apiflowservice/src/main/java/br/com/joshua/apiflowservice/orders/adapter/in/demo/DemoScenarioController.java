@@ -3,6 +3,7 @@ package br.com.joshua.apiflowservice.orders.adapter.in.demo;
 import br.com.joshua.apiflowservice.flowtracking.adapter.in.web.FlowTrackingFilter;
 import br.com.joshua.apiflowservice.products.application.ProductService;
 import br.com.joshua.apiflowservice.products.domain.Product;
+import br.com.joshua.apiflowservice.shared.demo.DemoLatency;
 import br.com.joshua.apiflowservice.shared.demo.DemoLatencyFilter;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -75,6 +76,7 @@ public class DemoScenarioController {
                 .headers(h -> {
                     if (delay != null) {
                         h.set(DemoLatencyFilter.DELAY_HEADER, String.valueOf(delay));
+                        h.set(DemoLatencyFilter.TARGET_HEADER, DemoLatency.DEFAULT_TARGET);
                     }
                 })
                 .body(body)

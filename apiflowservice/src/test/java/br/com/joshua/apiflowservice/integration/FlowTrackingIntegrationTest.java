@@ -171,6 +171,22 @@ class FlowTrackingIntegrationTest {
     }
 
     @Test
+    void artificialDelayCanTargetAnyStepOfAnyEndpoint() throws Exception {
+        MvcResult result = mvc.perform(get("/api/products/1")
+                        .header("X-Demo-Delay-Ms", "250")
+                        .header("X-Demo-Delay-Target", "ProductRepository.findById"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        FlowTrace trace = awaitPersisted(result.getResponse().getHeader("X-Flow-Trace-Id"));
+        FlowSpan repository = single(trace, "ProductRepository", "findById");
+        assertThat(repository.durationMicros()).isGreaterThanOrEqualTo(250_000);
+        assertThat(repository.tags()).containsEntry("demo.artificialDelayMs", "250");
+        assertThat(single(trace, "PostgreSQL", "SELECT products by id").durationMicros()).isLessThan(250_000);
+        assertThat(single(trace, "ProductController", "get").tags()).isEmpty();
+    }
+
+    @Test
     void propagatesAnIncomingW3cTraceId() throws Exception {
         String incoming = "4bf92f3577b34da6a3ce929d0e0e4736";
         mvc.perform(get("/api/products/1").header("traceparent", "00-" + incoming + "-00f067aa0ba902b7-01"))
@@ -239,6 +255,30 @@ class FlowTrackingIntegrationTest {
 
         mvc.perform(delete("/api/flow/traces")).andExpect(jsonPath("$.deletedTraces").value(2));
         mvc.perform(get("/api/flow/traces/{id}", ok)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void catalogListsOnlyTrackedEndpointsWithRequestTemplates() throws Exception {
+        mvc.perform(get("/api/flow/endpoints"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.path =~ /\\/api\\/(flow|demo).*/)]").isEmpty())
+                .andExpect(jsonPath("$[?(@.method == 'POST' && @.path == '/api/orders')].bodyExample.items[0].productId")
+                        .value(1))
+                .andExpect(jsonPath("$[?(@.method == 'POST' && @.path == '/api/orders')].instrumented").value(true))
+                .andExpect(jsonPath("$[?(@.method == 'GET' && @.path == '/api/products/{id}')].pathVariables[0]")
+                        .value("id"))
+                .andExpect(jsonPath("$[?(@.method == 'GET' && @.path == '/api/orders')].queryParams[0].name")
+                        .value("limit"))
+                .andExpect(jsonPath("$[?(@.method == 'GET' && @.path == '/api/orders')].queryParams[0].defaultValue")
+                        .value("20"))
+                .andExpect(jsonPath("$[?(@.method == 'GET' && @.path == '/api/orders')].entryStep")
+                        .value("OrderController.recentOrders"));
+    }
+
+    @Test
+    void blueprintWithoutReferenceIsNoContent() throws Exception {
+        mvc.perform(get("/api/flow/blueprint").param("method", "DELETE").param("endpoint", "/nothing"))
+                .andExpect(status().isNoContent());
     }
 
     @Test

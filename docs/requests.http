@@ -36,6 +36,7 @@ POST {{base}}/api/orders
 Content-Type: application/json
 X-Flow-Scenario: slow
 X-Demo-Delay-Ms: 1500
+X-Demo-Delay-Target: StockService
 
 {
   "items": [

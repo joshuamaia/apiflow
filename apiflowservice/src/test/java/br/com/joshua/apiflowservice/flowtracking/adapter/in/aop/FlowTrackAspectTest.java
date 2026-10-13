@@ -2,6 +2,7 @@ package br.com.joshua.apiflowservice.flowtracking.adapter.in.aop;
 
 import br.com.joshua.apiflowservice.flowtracking.api.ComponentResolver;
 import br.com.joshua.apiflowservice.flowtracking.api.FlowTrack;
+import br.com.joshua.apiflowservice.flowtracking.api.SpanStartHook;
 import br.com.joshua.apiflowservice.flowtracking.application.ActiveTrace;
 import br.com.joshua.apiflowservice.flowtracking.application.AsyncTraceWriter;
 import br.com.joshua.apiflowservice.flowtracking.application.DefaultComponentResolver;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 
 import java.time.Clock;
+import java.util.List;
 
 import static br.com.joshua.apiflowservice.flowtracking.application.RecordingSupport.await;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,6 +127,48 @@ class FlowTrackAspectTest {
         FlowTrace trace = withinTrace(inventory::selfInvocation);
 
         assertThat(trace.spans()).extracting(FlowSpan::operation).containsExactly("selfInvocation");
+    }
+
+    @Test
+    void startHooksRunInsideTheStepAndCanTagIt() {
+        SpanStartHook slowInventory = step -> {
+            if (step.component().equals("Inventory")) {
+                step.tag("demo.artificialDelayMs", "30");
+                sleep(30);
+            }
+        };
+        FlowTrackAspect aspect = new FlowTrackAspect(
+                new MicrometerFlowTracker(recorder, null, null, List.of(slowInventory)), new DefaultComponentResolver());
+        Checkout checkout = proxy(new Checkout(proxy(new Inventory(), aspect)), aspect);
+
+        FlowTrace trace = withinTrace(checkout::checkout);
+
+        FlowSpan inventory = trace.spans().get(1);
+        assertThat(inventory.durationMicros()).isGreaterThanOrEqualTo(30_000);
+        assertThat(inventory.tags()).containsEntry("demo.artificialDelayMs", "30");
+        assertThat(trace.spans().get(0).tags()).isEmpty();
+    }
+
+    @Test
+    void failingStartHookDoesNotBreakTheBusinessCall() {
+        SpanStartHook broken = step -> {
+            throw new IllegalStateException("hook bug");
+        };
+        FlowTrackAspect aspect = new FlowTrackAspect(
+                new MicrometerFlowTracker(recorder, null, null, List.of(broken)), new DefaultComponentResolver());
+        Inventory inventory = proxy(new Inventory(), aspect);
+
+        FlowTrace trace = withinTrace(() -> assertThat(inventory.available("sku")).isEqualTo(42));
+
+        assertThat(trace.spans()).extracting(FlowSpan::status).containsExactly(SpanStatus.COMPLETED);
+    }
+
+    private static void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test

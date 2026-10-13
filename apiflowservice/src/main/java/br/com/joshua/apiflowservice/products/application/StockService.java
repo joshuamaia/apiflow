@@ -5,7 +5,6 @@ import br.com.joshua.apiflowservice.flowtracking.domain.ComponentType;
 import br.com.joshua.apiflowservice.products.application.port.out.ProductRepository;
 import br.com.joshua.apiflowservice.products.domain.InsufficientStockException;
 import br.com.joshua.apiflowservice.products.domain.Product;
-import br.com.joshua.apiflowservice.shared.demo.DemoLatency;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,11 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class StockService {
 
     private final ProductRepository repository;
-    private final DemoLatency demoLatency;
 
-    public StockService(ProductRepository repository, DemoLatency demoLatency) {
+    public StockService(ProductRepository repository) {
         this.repository = repository;
-        this.demoLatency = demoLatency;
     }
 
     /**
@@ -30,7 +27,6 @@ public class StockService {
     @FlowTrack(type = ComponentType.SERVICE)
     @Transactional
     public void reserveStock(Product product, int quantity) {
-        demoLatency.applyIfRequested();
         product.ensureAvailable(quantity);
         if (!repository.decrementStock(product.id(), quantity)) {
             Product current = repository.findById(product.id()).orElse(product);

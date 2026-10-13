@@ -95,12 +95,16 @@ public class FlowTraceController {
         return ResponseEntity.of(queries.findTrace(traceId).flatMap(view -> spanDetail(view.trace(), spanId)));
     }
 
-    /** Steps of the latest successful execution of an endpoint – used to show steps not executed. */
+    /**
+     * Steps of the latest successful execution of an endpoint – used to show steps not executed.
+     * Responds 204 when the endpoint has no successful execution yet (a normal situation, not an error).
+     */
     @GetMapping("/blueprint")
     public ResponseEntity<BlueprintDto> blueprint(@RequestParam String method, @RequestParam String endpoint) {
-        return ResponseEntity.of(queries.blueprint(method.toUpperCase(), endpoint)
-                .map(b -> new BlueprintDto(b.referenceTraceId(), b.trace().httpMethod(), b.trace().endpoint(),
-                        b.trace().spans().stream().map(mapper::span).toList())));
+        return queries.blueprint(method.toUpperCase(), endpoint)
+                .map(b -> ResponseEntity.ok(new BlueprintDto(b.referenceTraceId(), b.trace().httpMethod(),
+                        b.trace().endpoint(), b.trace().spans().stream().map(mapper::span).toList())))
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     /** Latest executions in chronological order, for timelines and sparklines. */

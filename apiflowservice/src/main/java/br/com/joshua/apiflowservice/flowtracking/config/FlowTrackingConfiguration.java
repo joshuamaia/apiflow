@@ -6,12 +6,14 @@ import br.com.joshua.apiflowservice.flowtracking.api.ComponentResolver;
 import br.com.joshua.apiflowservice.flowtracking.api.FlowEventListener;
 import br.com.joshua.apiflowservice.flowtracking.api.FlowEventPublisher;
 import br.com.joshua.apiflowservice.flowtracking.api.FlowTracker;
+import br.com.joshua.apiflowservice.flowtracking.api.SpanStartHook;
 import br.com.joshua.apiflowservice.flowtracking.api.TraceRepository;
 import br.com.joshua.apiflowservice.flowtracking.application.AsyncTraceWriter;
 import br.com.joshua.apiflowservice.flowtracking.application.CompositeFlowEventPublisher;
 import br.com.joshua.apiflowservice.flowtracking.application.DefaultComponentResolver;
 import br.com.joshua.apiflowservice.flowtracking.application.FlowRecorder;
 import br.com.joshua.apiflowservice.flowtracking.application.MicrometerFlowTracker;
+import br.com.joshua.apiflowservice.flowtracking.application.TrackedPaths;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import io.micrometer.observation.ObservationRegistry;
@@ -62,8 +64,9 @@ public class FlowTrackingConfiguration {
     @Bean
     @ConditionalOnMissingBean
     FlowTracker flowTracker(FlowRecorder recorder, ObjectProvider<ObservationRegistry> observationRegistry,
-                            ObjectProvider<Tracer> tracer) {
-        return new MicrometerFlowTracker(recorder, observationRegistry.getIfAvailable(), tracer.getIfAvailable());
+                            ObjectProvider<Tracer> tracer, ObjectProvider<SpanStartHook> hooks) {
+        return new MicrometerFlowTracker(recorder, observationRegistry.getIfAvailable(), tracer.getIfAvailable(),
+                hooks.orderedStream().toList());
     }
 
     @Bean
@@ -78,10 +81,14 @@ public class FlowTrackingConfiguration {
     }
 
     @Bean
+    TrackedPaths trackedPaths(FlowTrackingProperties properties) {
+        return new TrackedPaths(properties.getIncludePaths(), properties.getExcludePaths());
+    }
+
+    @Bean
     FilterRegistrationBean<FlowTrackingFilter> flowTrackingFilter(FlowRecorder recorder, ObjectProvider<Tracer> tracer,
-                                                                 FlowTrackingProperties properties) {
-        FlowTrackingFilter filter = new FlowTrackingFilter(recorder, tracer.getIfAvailable(),
-                properties.getIncludePaths(), properties.getExcludePaths());
+                                                                 TrackedPaths trackedPaths, FlowTrackingProperties properties) {
+        FlowTrackingFilter filter = new FlowTrackingFilter(recorder, tracer.getIfAvailable(), trackedPaths);
         FilterRegistrationBean<FlowTrackingFilter> registration = new FilterRegistrationBean<>(filter);
         // After ServerHttpObservationFilter (HIGHEST_PRECEDENCE + 1) so the HTTP trace context is available.
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);

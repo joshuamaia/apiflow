@@ -3,6 +3,7 @@ package br.com.joshua.apiflowservice.flowtracking.adapter.in.web;
 import br.com.joshua.apiflowservice.flowtracking.application.ActiveTrace;
 import br.com.joshua.apiflowservice.flowtracking.application.FlowRecorder;
 import br.com.joshua.apiflowservice.flowtracking.application.IdGenerator;
+import br.com.joshua.apiflowservice.flowtracking.application.TrackedPaths;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import jakarta.servlet.FilterChain;
@@ -11,14 +12,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.server.PathContainer;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerMapping;
-import org.springframework.web.util.pattern.PathPattern;
-import org.springframework.web.util.pattern.PathPatternParser;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -39,21 +36,17 @@ public class FlowTrackingFilter extends OncePerRequestFilter {
 
     private final FlowRecorder recorder;
     private final Tracer tracer;
-    private final List<PathPattern> includes;
-    private final List<PathPattern> excludes;
+    private final TrackedPaths trackedPaths;
 
-    public FlowTrackingFilter(FlowRecorder recorder, Tracer tracer, List<String> includePatterns,
-                              List<String> excludePatterns) {
+    public FlowTrackingFilter(FlowRecorder recorder, Tracer tracer, TrackedPaths trackedPaths) {
         this.recorder = recorder;
         this.tracer = tracer == null ? Tracer.NOOP : tracer;
-        this.includes = parse(includePatterns);
-        this.excludes = parse(excludePatterns);
+        this.trackedPaths = trackedPaths;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        PathContainer path = PathContainer.parsePath(pathOf(request));
-        return includes.stream().noneMatch(p -> p.matches(path)) || excludes.stream().anyMatch(p -> p.matches(path));
+        return !trackedPaths.isTracked(pathOf(request));
     }
 
     @Override
@@ -115,7 +108,4 @@ public class FlowTrackingFilter extends OncePerRequestFilter {
                 ? uri.substring(contextPath.length()) : uri;
     }
 
-    private static List<PathPattern> parse(List<String> patterns) {
-        return patterns == null ? List.of() : patterns.stream().map(PathPatternParser.defaultInstance::parse).toList();
-    }
 }

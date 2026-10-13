@@ -123,7 +123,7 @@ valores têm padrão). O `.env` está no `.gitignore`.
 
 ## Executando os cenários
 
-No painel **Run a request** do dashboard há três cenários. Cada um dispara um `POST /api/orders`
+No painel **Run a request** do dashboard há três abas: **Scenarios**, **Order** e **Endpoint**. Na primeira há três cenários. Cada um dispara um `POST /api/orders`
 **real**; com *Follow live requests* ligado, o grafo acompanha a requisição enquanto ela acontece.
 
 | Cenário | O que acontece | Resultado esperado |
@@ -132,7 +132,44 @@ No painel **Run a request** do dashboard há três cenários. Cada um dispara um
 | **Insufficient stock** | A segunda linha pede mais unidades do que o "Limited Edition Headset" (estoque 3) possui | `422`, falha no `StockService`, `OrderRepository` marcado como *não executado* |
 | **Slow operation** | Pedido válido com atraso **artificial** configurável (100 ms – 5 s) no `StockService` | `201`, `StockService` em amarelo, comparação com a mediana normal |
 
-A aba **Custom** monta um pedido arbitrário com Reactive Forms (produtos, quantidades e atraso opcional).
+A aba **Order** monta um pedido arbitrário com Reactive Forms (produtos, quantidades e atraso opcional).
+
+### Qualquer endpoint (aba Endpoint)
+
+A aba **Endpoint** lista todos os endpoints rastreados, descobertos dos mapeamentos reais do Spring MVC
+(`GET /api/flow/endpoints`). Escolha um, preencha as variáveis de caminho e os parâmetros de query e,
+quando houver `@RequestBody`, edite o JSON — um exemplo é gerado automaticamente a partir do tipo do
+corpo. O grafo acompanha a requisição e a resposta aparece logo abaixo do botão.
+
+Novos endpoints aparecem nessa lista sem alterar o frontend: basta que a rota esteja em
+`flow.tracking.include-paths` (e, para mostrar as etapas, que os métodos tenham `@FlowTrack`).
+
+![Atraso artificial em outro endpoint](docs/images/dashboard-endpoint-delay.png)
+
+### Atraso artificial em qualquer etapa
+
+Para demonstrar lentidão em qualquer endpoint, a requisição pode pedir um atraso **artificial** em uma
+etapa específica, com dois headers:
+
+| Header | Valor |
+|---|---|
+| `X-Demo-Delay-Ms` | atraso em ms (até 5000) |
+| `X-Demo-Delay-Target` | etapa que recebe o atraso: `Componente` ou `Componente.operação` (padrão: `StockService`) |
+
+Na aba **Endpoint** isso vira dois campos. As etapas sugeridas vêm da última execução do endpoint
+escolhido; se ele nunca rodou, a sugestão é o próprio controller (o catálogo já sabe o nome dessa etapa).
+Ao informar um atraso, a etapa é preenchida automaticamente com a primeira abaixo do controller, e pode
+ser trocada. O atraso é aplicado **uma vez**, dentro da primeira etapa que corresponder — então
+ele conta como tempo daquela etapa (e dos seus pais), não dos filhos — e a etapa recebe a tag
+`demo.artificialDelayMs`, exibida no painel de detalhes como "atraso artificial". O código de negócio
+não sabe disso: o atraso é aplicado por um `SpanStartHook` do módulo de demonstração (veja
+[Reutilizando a instrumentação](#reutilizando-a-instrumentação-em-outro-projeto)). Só etapas
+instrumentadas podem receber atraso.
+
+```bash
+curl -i http://localhost:4200/api/products/1 \
+  -H 'X-Demo-Delay-Ms: 1500' -H 'X-Demo-Delay-Target: ProductRepository.findById'
+```
 
 ### Pela linha de comando
 
@@ -149,7 +186,8 @@ curl -i -X POST http://localhost:4200/api/orders \
 
 # Cenário 3 — lento (atraso artificial de 1500 ms, apenas demonstração)
 curl -i -X POST http://localhost:4200/api/orders \
-  -H 'Content-Type: application/json' -H 'X-Flow-Scenario: slow' -H 'X-Demo-Delay-Ms: 1500' \
+  -H 'Content-Type: application/json' -H 'X-Flow-Scenario: slow' \
+  -H 'X-Demo-Delay-Ms: 1500' -H 'X-Demo-Delay-Target: StockService' \
   -d '{"items":[{"productId":1,"quantity":1}]}'
 
 # Ou peça ao backend para executar o cenário (ele mesmo faz o POST /api/orders via HTTP)
@@ -391,7 +429,8 @@ Todas as respostas são DTOs específicos (nenhuma entidade JPA é exposta).
 | `GET` | `/api/flow/traces/{traceId}` | Estado consolidado do trace com todas as etapas (`live: true/false`) |
 | `GET` | `/api/flow/traces/{traceId}/spans` | Etapas do trace |
 | `GET` | `/api/flow/traces/{traceId}/spans/{spanId}` | Etapa + ancestrais + filhos + mediana normal e diferença |
-| `GET` | `/api/flow/blueprint?method=&endpoint=` | Etapas da última execução bem-sucedida do endpoint |
+| `GET` | `/api/flow/blueprint?method=&endpoint=` | Etapas da última execução bem-sucedida do endpoint (204 se ainda não houver) |
+| `GET` | `/api/flow/endpoints` | Endpoints rastreados (método, rota, variáveis, query params, exemplo de corpo, etapa de entrada) |
 | `GET` | `/api/flow/history?limit=` | Últimas execuções em ordem cronológica |
 | `GET` | `/api/flow/metrics` | Totais, sucesso, erro, latência média/máxima/p95, total de etapas |
 | `GET` | `/api/flow/metrics/components` | Execuções, erros, mediana, média e máximo por operação |
@@ -453,10 +492,10 @@ mas este número não é um benchmark rigoroso. Para medir no seu ambiente, comp
 ## Testes
 
 ```bash
-# backend — 41 testes (unitários + integração com PostgreSQL real via Testcontainers; requer Docker)
+# backend — 50 testes (unitários + integração com PostgreSQL real via Testcontainers; requer Docker)
 cd apiflowservice && ./mvnw test
 
-# frontend — 17 testes (Vitest)
+# frontend — 25 testes (Vitest)
 cd apiflowweb && npm ci && npx ng test --watch=false
 ```
 
@@ -514,6 +553,7 @@ flow:
 | `FlowEventPublisher` | publicação de eventos (padrão: fan-out isolado para todos os listeners) |
 | `TraceRepository` | persistência de rastreamentos (escrita) |
 | `InFlightTraces` | leitura de traces ainda em memória |
+| `SpanStartHook` | extensão executada no início de cada etapa (usada pelo atraso artificial da demo) |
 
 O módulo `flowvisualization` é um exemplo de consumidor: implementa `FlowEventListener` para o SSE e
 lê o schema via SQL, sem conhecer pedidos ou produtos.
